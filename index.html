@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      body {
+        margin: 0;
+        padding-bottom: 3rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+      }
+      ul#onlines {
+        margin: 0px;
+        padding: 0px 0px 0px 25px;
+        padding-left:20px;
+        background-color: yellow;
+        display: flex;
+        text-align: center;
+        
+      }
+      ul#onlines li {
+        margin: 0 0 0 25px; 
+        padding: 0px;
+        background-color:red;
+        color:black;
+        text-align:center;
+      }
+      /* #typing {
+        display: none;
+      } */
+      #form {
+        background: rgba(0, 0, 0, 0.15);
+        padding: 0.25rem;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        height: 3rem;
+        box-sizing: border-box;
+        backdrop-filter: blur(10px);
+      }
+      #input {
+        border: none;
+        padding: 0 1rem;
+        flex-grow: 1;
+        border-radius: 2rem;
+        margin: 0.25rem;
+      }
+      #input:focus {
+        outline: none;
+      }
+      #form > button {
+        background: #333;
+        border: none;
+        padding: 0 1rem;
+        margin: 0.25rem;
+        border-radius: 3px;
+        outline: none;
+        color: #fff;
+      }
+
+      #userName {
+        border: none;
+        padding: 0 1rem;
+        flex-grow: 1;
+        border-radius: 2rem;
+        margin: 0.25rem;
+        max-width: 10em;
+      }
+
+      #messages {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+      }
+      #messages > li {
+        padding: 0.5rem 1rem;
+      }
+      #messages > li:nth-child(odd) {
+        background: #efefef;
+      }
+    </style>
+  </head>
+  <body>
+    <ul id="onlines">
+      <ol>hi</ol>
+      <ol>123</ol>
+    </ul>
+    <ul id="messages"></ul>
+
+    <div id="typing" style="display: none;">
+      <div>hi</div>
+      <div>123</div>
+      正在輸入中...
+    </div>
+    <form id="form" action="">
+      <!-- <input id="userName" placeholder="type your Name"> -->
+      <input id="input" autocomplete="off" /><button>Send</button>
+    </form>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const nickName = prompt('type your nick name:');
+      var socket = io();
+
+      var messages = document.getElementById('messages');
+      var form = document.getElementById('form');
+      var input = document.getElementById('input');
+      var whoIsTyping = {}
+      var onlineArr = [];
+
+      socket.emit('connection', nickName);
+
+      form.addEventListener('submit',function(e) {
+        e.preventDefault();
+        if(input.value){
+          //處理私人訊息
+          let tagIndex = input.value.indexOf('@');
+          let tagName = input.value.slice(tagIndex+1,input.value.slice(tagIndex+1).indexOf(' ')+tagIndex+1);
+          let message = input.value.slice(input.value.indexOf(tagName)+tagName.length+1);
+          if(onlineArr.indexOf(tagName)!= -1){
+            socket.emit('private message',{from:nickName,to:tagName,message:message});
+          }else{
+            socket.emit('chat message', {name:nickName,message:input.value});
+          }
+          input.value = '';
+        }
+      });
+
+      
+      socket.on("connect",() => {
+        console.log(socket.id);
+      });
+
+      socket.on('connection',(data) => {
+        updateOnlines(data.onlines);
+        displayMessage(data.message);
+      });
+      socket.on('disconnected',(msg) => {
+        displayMessage(msg);
+      });
+
+      //接收訊息
+      socket.on('chat message',(data) => {
+        if(data.name==nickName)displayMessage("我:"+data.message);
+        else{displayMessage(data.name+":"+data.message);}
+      });
+      
+      socket.on('private message', (data) => {
+        if(data.from === nickName){
+          displayMessage("我->"+data.to+":"+data.message);
+        }
+        if(data.to === nickName){
+          displayMessage(data.from+"->我:"+data.message);
+        }
+      });
+
+      socket.on('updateOnline',(onlines) => {
+        updateOnlines(onlines);
+      });
+
+      socket.on('updateTyping',(guysOBJ) => {
+        let whoTypingFeid = document.getElementById('typing');
+        //如果和原先資料不同才要更新
+        // whoISTyping 是 本機端儲存正在打字的人
+        // guysOBJ 是 更新後傳入的參數(dict)
+        if(Object.keys(whoIsTyping).length != Object.keys(guysOBJ).length){
+          //不須顯示自己正在打字
+          if(Object.keys(guysOBJ).length < 1||Object.keys(guysOBJ).length == 1 && guysOBJ.hasOwnProperty(socket.id)){
+            whoTypingFeid.style.display = "none";
+          }else{
+            whoTypingFeid.innerHTML = '';
+            
+            Object.values(guysOBJ).forEach((guy) => {
+              let row = `<div>${guy}</div>`;
+              if(guy != guysOBJ[socket.id])whoTypingFeid.innerHTML += row;
+            });
+            whoTypingFeid.innerHTML += '正在輸入中...';
+            whoTypingFeid.style.display = "block";
+          }
+          whoIsTyping = guysOBJ;
+        }
+      });
+
+      //偵測自身是否正在打字
+      setInterval(function() {
+        if(input.value === ''){
+          socket.emit('noTyping',socket.id);
+        }else{
+          socket.emit('typing',socket.id);
+        }
+      },100);
+
+      function displayMessage(msg){
+        var item = document.createElement('li');
+        item.textContent = msg;
+        messages.appendChild(item);
+        window.scrollTo(0,document.body.scrollHeight);
+      }
+      function updateOnlines(onlinesOBJ){
+        let onlinesHTML = document.getElementById("onlines");
+        onlinesHTML.innerHTML = '';
+        onlineArr = Object.values(onlinesOBJ);
+        onlineArr.forEach(name => {
+          let row = `<li>${name}</li>`;
+          onlinesHTML.innerHTML += row;
+          console.log(row);
+        });
+      }
+    </script>
+  </body>
+</html>
