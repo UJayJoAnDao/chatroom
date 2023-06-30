@@ -13,8 +13,13 @@ app.get('/', (req, res) => {
 
 let onlines = {};
 let whoIsTyping = {};
+
+let  rooms = [];
+
 //連線監測
 io.on('connect', (socket) => {
+    // 一開始先進入大廳
+    socket.join('lobby');
     //sever接收訊息
     socket.on('connection', (nickName) => {
         console.log(`${nickName} is connected.`);
@@ -33,12 +38,18 @@ io.on('connect', (socket) => {
         console.log(onlines);
     });
     
-    
+    socket.on("join", (data) => { //data = {oldroom,newroom}
+        console.log(data.oldroom,data.newroom);
+        socket.leave(data.oldroom);
+        socket.join(data.newroom);
+        if(!rooms.includes(data.newroom)){
+            rooms.push(data.newroom);
+        }
+    });
     socket.on('chat message', (data) => {
-        // console.log(socket.data);
         console.log(`chat message ${data.name}:` + data.message);
         // server發送訊息
-        io.emit('chat message', (data));
+        io.to(data.room).emit('chat message', (data));
     });
     socket.on('private message', (data) => {
         console.log(data);

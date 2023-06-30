@@ -114,16 +114,20 @@
       var input = document.getElementById('input');
       var whoIsTyping = {}
       var onlineArr = [];
+      
+      var room = 'lobby';
 
       socket.emit('connection', nickName);
 
       form.addEventListener('submit',function(e) {
         e.preventDefault();
         if(input.value.slice(0,5) == "/join"){
-          socket.join(input.value.slice(6))
-          console.log(nickName,"加入",input.value.slice(6));
-        }
-        if(input.value){
+          // 輸入 "/join abc" 會加入 abc房間
+          socket.emit("join",{oldroom:room, newroom:input.value.slice(6)});
+          console.log(nickName,"原本在",room,"房間");
+          room = input.value.slice(6);
+          console.log(nickName,"加入",room,"房間");
+        }else if(input.value){
           //處理私人訊息
           let tagIndex = input.value.indexOf('@');
           let tagName = input.value.slice(tagIndex+1,input.value.slice(tagIndex+1).indexOf(' ')+tagIndex+1);
@@ -131,10 +135,10 @@
           if(onlineArr.indexOf(tagName)!= -1){
             socket.emit('private message',{from:nickName,to:tagName,message:message});
           }else{
-            socket.emit('chat message', {name:nickName,message:input.value});
+            socket.emit('chat message', {name:nickName,message:input.value,room:room});
           }
-          input.value = '';
         }
+        input.value = '';
       });
 
       
