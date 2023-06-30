@@ -102,6 +102,11 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
       const nickName = prompt('type your nick name:');
+      if (!nickName) {
+        alert('請輸入暱稱');
+        window.location.reload();
+      }
+
       var socket = io();
 
       var messages = document.getElementById('messages');
@@ -114,6 +119,10 @@
 
       form.addEventListener('submit',function(e) {
         e.preventDefault();
+        if(input.value.slice(0,5) == "/join"){
+          socket.join(input.value.slice(6))
+          console.log(nickName,"加入",input.value.slice(6));
+        }
         if(input.value){
           //處理私人訊息
           let tagIndex = input.value.indexOf('@');
